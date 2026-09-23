@@ -39,3 +39,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Repomix dumps
+project-context.txt
+repomix-output.xml
+
+# VS Code personal settings
+.vscode/
