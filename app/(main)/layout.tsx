@@ -3,8 +3,9 @@
 import LeftRailProfile from "@/components/LeftRailProfile";
 import ComposeModal from "@/components/ComposeModal";
 import Link from "next/link";
-import { useEffect, useLayoutEffect, useRef } from "react";
-import { usePathname } from "next/navigation";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { supabase } from "@/app/supabase";
 
 const scrollPositions = new Map<string, number>();
 
@@ -18,7 +19,37 @@ function getScrollKey(pathname: string): string {
 
 export default function MainLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const mainRef = useRef<HTMLElement>(null);
+
+  const [hasSession, setHasSession] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
+
+  // Auth gate — no protected page renders until we know the session state
+  useEffect(() => {
+    let cancelled = false;
+
+    async function checkAuth() {
+      window.dispatchEvent(new CustomEvent('show-splash'));
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (cancelled) return;
+
+      if (!session) {
+        // No session — redirect. Splash stays visible during redirect.
+        router.replace('/login');
+        return;
+      }
+
+      // Session exists — allow children to mount
+      setHasSession(true);
+      setAuthChecked(true);
+      window.dispatchEvent(new CustomEvent('hide-splash'));
+    }
+
+    checkAuth();
+    return () => { cancelled = true; };
+  }, [router]);
 
   const isChat = pathname?.startsWith('/chat');
   const containerWidth = isChat ? "w-[700px]" : "w-[650px]";
@@ -127,6 +158,9 @@ useEffect(() => {
     { href: '/bookmarks', label: 'Bookmarks', path: 'M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z' },
     { href: '/settings', label: 'Settings', path: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065zM15 12a3 3 0 11-6 0 3 3 0 016 0z' },
   ];
+
+  // While checking auth (or redirecting), render nothing — the splash covers the screen
+  if (!authChecked) return null;
 
   return (
     <div className="h-screen overflow-hidden bg-background flex justify-center pr-[280px]">

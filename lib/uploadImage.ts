@@ -121,5 +121,6 @@ export async function uploadImages(files: File[]): Promise<{ ok: true; urls: str
  */
 export async function deleteImages(paths: string[]): Promise<void> {
   if (paths.length === 0) return;
-  await supabase.storage.from('post-images').remove(paths);
+  const { error } = await supabase.storage.from('post-images').remove(paths);
+  if (error) throw new Error(error.message);
 }

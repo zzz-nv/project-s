@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../supabase';
 import { useRouter } from 'next/navigation';
 
@@ -12,6 +12,11 @@ export default function AuthPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [status, setStatus] = useState('');
+
+    // If we land on login page fresh, make sure no stale splash is showing
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('hide-splash'));
+  }, []);
 
   async function handleAuth(e: React.FormEvent) {
     e.preventDefault();
@@ -82,11 +87,12 @@ export default function AuthPage() {
     setStatus('Almost there…');
 
     // Poll for session readiness before redirecting
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < 30; i++) {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
+        // Cover the login → feed transition with the splash
+        window.dispatchEvent(new CustomEvent('show-splash'));
         router.push('/');
-        router.refresh();
         return;
       }
       await new Promise((r) => setTimeout(r, 100));

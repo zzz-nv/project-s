@@ -6,9 +6,11 @@ import { supabase } from '@/app/supabase';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+
 import TweetCard from '@/components/TweetCard';
 import InlineBackButton from '@/components/InlineBackButton';
 import { loadThread } from '@/lib/loadThread';
+import { deleteTweetWithImages } from '@/lib/deleteTweet';
 
 
 export default function ThreadPage({ params }: { params: Promise<{ username: string, id: string }> }) {
@@ -60,8 +62,8 @@ export default function ThreadPage({ params }: { params: Promise<{ username: str
   }
 
     async function deleteTweet(tweetId: string) {
-    const { error } = await supabase.from('tweets').delete().eq('id', tweetId);
-    if (error) return;
+    const result = await deleteTweetWithImages(tweetId);
+    if (!result.ok) return;
 
     if (tweetId === id) {
       router.back();

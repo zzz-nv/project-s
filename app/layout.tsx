@@ -4,12 +4,20 @@ import "./globals.css";
 
 import Providers from './providers';
 import RefreshSplash from '@/components/RefreshSplash';
+import SplashOverlay from '@/components/SplashOverlay';
 import ToastContainer from '@/components/Toast';
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
-export const metadata: Metadata = { title: "S" };
+export const metadata: Metadata = {
+  title: "S",
+  icons: {
+    icon: "/S_logo.svg",
+    shortcut: "/S_logo.svg",
+    apple: "/S_logo.svg",
+  },
+};
 
 const splashScript = `
 (function(){
@@ -39,8 +47,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           dangerouslySetInnerHTML={{ __html: splashScript }}
         />
 
-          <Providers>
+        <Providers>
           <RefreshSplash />
+          <SplashOverlay />
           {children}
           <ToastContainer />
         </Providers>

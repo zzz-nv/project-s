@@ -176,9 +176,9 @@ function FollowButton({ targetId }: { targetId: string }) {
       }
       setUserId(session.user.id);
 
-      const { data } = await supabase
+        const { data } = await supabase
         .from('follows')
-        .select('id')
+        .select('follower_id')
         .eq('follower_id', session.user.id)
         .eq('following_id', targetId)
         .maybeSingle();

@@ -9,6 +9,7 @@ import { supabase } from '@/app/supabase';
 import InlineComposer from '@/components/InlineComposer';
 import TweetCard from '@/components/TweetCard';
 import { loadFeed } from '@/lib/loadFeed';
+import { deleteTweetWithImages } from '@/lib/deleteTweet';
 
 
 
@@ -67,12 +68,12 @@ export default function ProjectS() {
   const user = data?.user;
   const tweets = data?.tweets ?? [];
 
-  // Redirect to login if no session
+  // Hide the transition splash as soon as feed data is ready
   useEffect(() => {
-    if (!isLoading && data === null) {
-      router.push('/login');
+    if (data !== null) {
+      window.dispatchEvent(new CustomEvent('hide-splash'));
     }
-  }, [isLoading, data, router]);
+  }, [data]);
 
   // Refresh feed when a new tweet is posted
   useEffect(() => {
@@ -84,15 +85,15 @@ export default function ProjectS() {
   }, [queryClient]);
 
     async function deleteTweet(tweetId: string) {
-    // Optimistic cache update — this triggers the exit animation
+    // Optimistic cache update — triggers the exit animation
     queryClient.setQueryData(['feed', feedType], (prev: any) => {
       if (!prev) return prev;
       return { ...prev, tweets: prev.tweets.filter((t: any) => t.id !== tweetId) };
     });
 
-    const { error } = await supabase.from('tweets').delete().eq('id', tweetId);
+    const result = await deleteTweetWithImages(tweetId);
 
-    if (error) {
+    if (!result.ok) {
       queryClient.invalidateQueries({ queryKey: ['feed'] });
     } else {
       window.dispatchEvent(new CustomEvent('show-toast', { detail: { message: 'Deleted!' } }));

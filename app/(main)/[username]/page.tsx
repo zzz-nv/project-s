@@ -9,6 +9,7 @@ import EditProfileModal from '@/components/EditProfileModal';
 import TweetCard from '@/components/TweetCard';
 import InlineBackButton from '@/components/InlineBackButton';
 import { loadProfile } from '@/lib/loadProfile';
+import { deleteTweetWithImages } from '@/lib/deleteTweet';
 
 
 export default function ProfilePage({ params }: { params: Promise<{ username: string }> }) {
@@ -153,9 +154,9 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
       tweets: prev.tweets.filter((t: any) => t.id !== tweetId),
     }));
 
-    const { error } = await supabase.from('tweets').delete().eq('id', tweetId);
+    const result = await deleteTweetWithImages(tweetId);
 
-    if (error) {
+    if (!result.ok) {
       queryClient.invalidateQueries({ queryKey: ['profile', targetUsername] });
     } else {
       window.dispatchEvent(new CustomEvent('show-toast', { detail: { message: 'Deleted!' } }));
