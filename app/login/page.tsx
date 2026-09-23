@@ -11,11 +11,13 @@ export default function AuthPage() {
   const [username, setUsername] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [status, setStatus] = useState('');
 
   async function handleAuth(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError('');
+    setStatus(isSignUp ? 'Creating account…' : 'Signing in…');
 
     if (isSignUp) {
       const cleanUsername = username.toLowerCase().replace(/\s+/g, '');
@@ -77,8 +79,20 @@ export default function AuthPage() {
       }
     }
 
-    router.push('/');
-    router.refresh();
+    setStatus('Almost there…');
+
+    // Poll for session readiness before redirecting
+    for (let i = 0; i < 20; i++) {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        router.push('/');
+        router.refresh();
+        return;
+      }
+      await new Promise((r) => setTimeout(r, 100));
+    }
+
+    setError('Login succeeded but session not ready. Please refresh.');
   }
 
   return (
@@ -142,7 +156,7 @@ export default function AuthPage() {
             disabled={loading}
             className="w-full bg-zinc-100 hover:bg-white text-background font-bold py-3.5 rounded-xl transition active:scale-95 mt-4 disabled:opacity-50"
           >
-            {loading ? 'Processing...' : isSignUp ? 'Create Account' : 'Sign In'}
+          {loading ? status || 'Processing…' : isSignUp ? 'Create Account' : 'Sign In'}
           </button>
         </form>
 
