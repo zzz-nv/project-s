@@ -13,10 +13,10 @@ const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"]
 export const metadata: Metadata = {
   title: "S",
   icons: {
-    icon: "/S_logo.svg",
-    shortcut: "/S_logo.svg",
-    apple: "/S_logo.svg",
-  },
+  icon: "/favicon.png?v=2",
+  shortcut: "/favicon.png",
+  apple: "/favicon.png",
+},
 };
 
 const splashScript = `
