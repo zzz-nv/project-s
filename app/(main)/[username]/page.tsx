@@ -8,8 +8,12 @@ import Link from 'next/link';
 import EditProfileModal from '@/components/EditProfileModal';
 import TweetCard from '@/components/TweetCard';
 import InlineBackButton from '@/components/InlineBackButton';
+
+//lib
 import { loadProfile } from '@/lib/loadProfile';
 import { deleteTweetWithImages } from '@/lib/deleteTweet';
+import { replaceAvatar, replaceBanner, removeAvatar, removeBanner } from '@/lib/manageProfileMedia';
+import ConfirmDialog from '@/components/ConfirmDialog';
 
 
 export default function ProfilePage({ params }: { params: Promise<{ username: string }> }) {
@@ -24,7 +28,9 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
   const [isFollowLoading, setIsFollowLoading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadingBanner, setUploadingBanner] = useState(false);
   const [justPostedId, setJustPostedId] = useState<string | null>(null);
+  const [confirmRemove, setConfirmRemove] = useState<'avatar' | 'banner' | null>(null);
 
   // ─── Cached data ───
   const { data, isLoading } = useQuery({
@@ -163,32 +169,30 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
     }
   }
 
-  async function uploadAvatar(event: React.ChangeEvent<HTMLInputElement>) {
+
+
+  /// Upload Avatar
+    async function uploadAvatar(event: React.ChangeEvent<HTMLInputElement>) {
     try {
       setUploading(true);
-      if (!event.target.files || event.target.files.length === 0) return;
+      const file = event.target.files?.[0];
+      if (!file) return;
 
-      const file = event.target.files[0];
-      const fileExt = file.name.split('.').pop();
-      const filePath = `${currentUser.id}/${Date.now()}.${fileExt}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(filePath, file);
-      if (uploadError) throw uploadError;
-
-      const { data } = supabase.storage.from('avatars').getPublicUrl(filePath);
-      const publicUrl = data.publicUrl;
+      const result = await replaceAvatar(currentUser.id, file, profile.avatar_url);
+      if (!result.ok) {
+        alert('Error uploading image: ' + result.error);
+        return;
+      }
 
       const { error: updateError } = await supabase
         .from('profiles')
-        .update({ avatar_url: publicUrl })
+        .update({ avatar_url: result.url })
         .eq('id', currentUser.id);
       if (updateError) throw updateError;
 
       setProfileData((prev) => ({
         ...prev,
-        profile: { ...prev.profile, avatar_url: publicUrl },
+        profile: { ...prev.profile, avatar_url: result.url },
       }));
     } catch (error: any) {
       alert('Error uploading image: ' + error.message);
@@ -196,6 +200,81 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
       setUploading(false);
     }
   }
+
+
+  async function handleRemoveAvatar() {
+    if (!profile?.avatar_url) return;
+
+    await removeAvatar(profile.avatar_url);
+
+    await supabase
+      .from('profiles')
+      .update({ avatar_url: null })
+      .eq('id', currentUser.id);
+
+    setProfileData((prev) => ({
+      ...prev,
+      profile: { ...prev.profile, avatar_url: null },
+    }));
+
+    setConfirmRemove(null);
+  }
+
+
+  /// Upload Banner
+    async function handleBannerUpload(event: React.ChangeEvent<HTMLInputElement>) {
+    try {
+      setUploadingBanner(true);
+      const file = event.target.files?.[0];
+      if (!file) return;
+
+      const result = await replaceBanner(currentUser.id, file, profile.banner_url);
+      if (!result.ok) {
+        alert('Error uploading banner: ' + result.error);
+        return;
+      }
+
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ banner_url: result.url })
+        .eq('id', currentUser.id);
+
+      if (updateError) throw updateError;
+
+      setProfileData((prev) => ({
+        ...prev,
+        profile: { ...prev.profile, banner_url: result.url },
+      }));
+    } catch (error: any) {
+      alert('Error: ' + error.message);
+    } finally {
+      setUploadingBanner(false);
+    }
+  }
+
+  async function handleRemoveBanner() {
+    if (!profile?.banner_url) return;
+
+    await removeBanner(profile.banner_url);
+
+    await supabase
+      .from('profiles')
+      .update({ banner_url: null })
+      .eq('id', currentUser.id);
+
+    setProfileData((prev) => ({
+      ...prev,
+      profile: { ...prev.profile, banner_url: null },
+    }));
+
+    setConfirmRemove(null);
+  }
+
+
+
+
+
+
 
   // ─── Skeleton ───
   if (isLoading) return (
@@ -241,74 +320,142 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
 
         <InlineBackButton title="Profile" />
 
-        <div className="p-6 border-b border-border-subtle">
-          <div className="flex justify-between items-start mb-4">
-            <div className="relative group w-24 h-24">
-              {profile.avatar_url ? (
-                <img
-                  src={profile.avatar_url}
-                  alt="Avatar"
-                  className="w-24 h-24 rounded-full object-cover border-4 border-zinc-950 shadow-lg"
-                />
-              ) : (
-                <div className="w-24 h-24 bg-zinc-800 rounded-full flex items-center justify-center text-zinc-400 font-bold text-4xl uppercase border-4 border-zinc-950 shadow-lg">
-                  {profile.username.charAt(0)}
-                </div>
-              )}
+                <div className="border-b border-border-subtle">
 
-              {isOwnProfile && (
-                <label className="absolute inset-0 bg-black/60 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity border-4 border-transparent">
-                  <span className="text-xs font-bold text-white">{uploading ? '...' : 'Upload'}</span>
+          {/* BANNER */}
+                    <div className="relative group w-full h-[150px] bg-surface overflow-hidden">
+            {profile.banner_url ? (
+              <img
+                src={profile.banner_url}
+                alt="Banner"
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full bg-background" />
+            )}
+
+            {isOwnProfile && (
+              <>
+                <label className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity">
+                  <span className="text-xs font-bold text-white bg-black/60 px-3 py-1.5 rounded-full">
+                    {uploadingBanner ? 'Uploading…' : 'Change banner'}
+                  </span>
                   <input
                     type="file"
                     accept="image/jpeg, image/png, image/webp"
-                    onChange={uploadAvatar}
-                    disabled={uploading}
+                    onChange={handleBannerUpload}
+                    disabled={uploadingBanner}
                     className="hidden"
                   />
                 </label>
-              )}
-            </div>
-
-            {isOwnProfile ? (
-              <button
-                onClick={() => setIsEditing(true)}
-                className="font-bold py-2 px-6 rounded-full border border-zinc-700 text-white hover:bg-zinc-800 transition active:scale-95"
-              >
-                Edit Profile
-              </button>
-            ) : (
-              <button
-                onClick={toggleFollow}
-                disabled={isFollowLoading}
-                className={`font-bold py-2 px-6 rounded-full transition active:scale-95 ${
-                  isFollowing
-                    ? 'bg-transparent border border-red-500 text-white hover:border-red-500 hover:text-red-500 hover:bg-red-500/10'
-                    : 'bg-white text-zinc-950 hover:bg-zinc-200'
-                }`}
-              >
-                {isFollowing ? 'Following' : 'Follow'}
-              </button>
+                {profile.banner_url && (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setConfirmRemove('banner'); }}
+                    className="absolute top-3 right-3 bg-black/70 hover:bg-red-500 text-white text-xs font-bold px-3 py-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                  >
+                    Remove
+                  </button>
+                )}
+              </>
             )}
           </div>
 
-          <h2 className="text-xl font-bold">{profile.display_name || profile.username}</h2>
-          <p className="text-zinc-500">@{profile.username}</p>
+                    {/* AVATAR + BUTTON + INFO */}
+          <div className="px-6">
 
-          {profile.bio && (
-            <p className="mt-4 text-zinc-200 text-[15px] leading-relaxed whitespace-pre-wrap">
-              {profile.bio}
-            </p>
-          )}
+            <div className="flex justify-between items-end -mt-16 mb-4">
+              {/* Avatar */}
+              <div className="relative group w-32 h-32">
+                {profile.avatar_url ? (
+                  <img
+                    src={profile.avatar_url}
+                    alt="Avatar"
+                    className="w-32 h-32 rounded-full object-cover border-4 border-background shadow-lg"
+                  />
+                ) : (
+                  <div className="w-32 h-32 bg-zinc-800 rounded-full flex items-center justify-center text-zinc-400 font-bold text-5xl uppercase border-4 border-background shadow-lg">
+                    {profile.username.charAt(0)}
+                  </div>
+                )}
 
-          <div className="flex gap-4 mt-4">
-            <button onClick={() => openFollowModal('following')} className="hover:underline">
-              <span className="font-bold text-zinc-200">{followingCount}</span> <span className="text-zinc-500">Following</span>
-            </button>
-            <button onClick={() => openFollowModal('followers')} className="hover:underline">
-              <span className="font-bold text-zinc-200">{followerCount}</span> <span className="text-zinc-500">Followers</span>
-            </button>
+                {isOwnProfile && (
+                  <>
+                    <label className="absolute inset-0 bg-black/60 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity border-4 border-background">
+                      <span className="text-xs font-bold text-white">{uploading ? '...' : 'Upload'}</span>
+                      <input
+                        type="file"
+                        accept="image/jpeg, image/png, image/webp"
+                        onChange={uploadAvatar}
+                        disabled={uploading}
+                        className="hidden"
+                      />
+                    </label>
+                    {profile.avatar_url && (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setConfirmRemove('avatar'); }}
+                        className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-black/80 hover:bg-red-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                        aria-label="Remove avatar"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {/* Follow / Edit button */}
+              <div className="pb-1">
+                {isOwnProfile ? (
+                  <button
+                    onClick={() => setIsEditing(true)}
+                    className="font-bold py-2 px-5 rounded-full border border-border-subtle text-white hover:bg-surface transition active:scale-95 text-sm"
+                  >
+                    Edit Profile
+                  </button>
+                ) : (
+                  <button
+                    onClick={toggleFollow}
+                    disabled={isFollowLoading}
+                    className={`font-bold py-2 px-5 rounded-full transition active:scale-95 text-sm ${
+                      isFollowing
+                        ? 'bg-transparent border border-red-500 text-white hover:border-red-500 hover:text-red-500 hover:bg-red-500/10'
+                        : 'bg-white text-black hover:bg-zinc-200'
+                    }`}
+                  >
+                    {isFollowing ? 'Following' : 'Follow'}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Info */}
+            <div className="pb-6">
+              <h2 className="text-2xl font-bold">{profile.display_name || profile.username}</h2>
+              <p className="text-text-muted">@{profile.username}</p>
+
+              {profile.bio && (
+                <p className="mt-4 text-zinc-200 text-[15px] leading-relaxed whitespace-pre-wrap">
+                  {profile.bio}
+                </p>
+              )}
+
+              <div className="flex gap-4 mt-4 text-sm">
+                <button onClick={() => openFollowModal('following')} className="hover:underline">
+                  <span className="font-bold text-zinc-200">{followingCount}</span>{' '}
+                  <span className="text-text-muted">Following</span>
+                </button>
+                <button onClick={() => openFollowModal('followers')} className="hover:underline">
+                  <span className="font-bold text-zinc-200">{followerCount}</span>{' '}
+                  <span className="text-text-muted">Followers</span>
+                </button>
+              </div>
+            </div>
           </div>
+
         </div>
 
         <div>
@@ -370,7 +517,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
           </div>
         )}
 
-        {isEditing && (
+                {isEditing && (
           <EditProfileModal
             profile={profile}
             onClose={() => setIsEditing(false)}
@@ -380,6 +527,28 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
                 profile: { ...prev.profile, ...updatedProfile },
               }));
             }}
+          />
+        )}
+
+        {confirmRemove === 'avatar' && (
+          <ConfirmDialog
+            title="Remove avatar?"
+            message="This can't be undone."
+            confirmText="Remove"
+            destructive
+            onConfirm={handleRemoveAvatar}
+            onCancel={() => setConfirmRemove(null)}
+          />
+        )}
+
+        {confirmRemove === 'banner' && (
+          <ConfirmDialog
+            title="Remove banner?"
+            message="This can't be undone."
+            confirmText="Remove"
+            destructive
+            onConfirm={handleRemoveBanner}
+            onCancel={() => setConfirmRemove(null)}
           />
         )}
 
