@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
+import SLogoLoader from '@/components/SLogoLoader';
+
 
 const FADE_MS = 220;
 const MIN_VISIBLE_MS = 300; // forced minimum on-screen time
@@ -67,7 +69,7 @@ export default function SplashOverlay() {
         fading ? 'opacity-0 pointer-events-none' : 'opacity-100'
       }`}
     >
-      <img src="/S_logo.svg" alt="S" className="w-16 h-16 animate-pulse" />
+        <SLogoLoader />
     </div>
   );
 }

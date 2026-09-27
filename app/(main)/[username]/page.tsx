@@ -128,6 +128,46 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
 
     setIsFollowLoading(false);
   }
+  
+    
+  
+  async function startChat() {
+    if (!currentUser || !profile) return;
+
+    // Check for an existing conversation with this user
+    const { data: myChats } = await supabase
+      .from('participants')
+      .select('conversation_id')
+      .eq('user_id', currentUser.id);
+
+    const myChatIds = myChats?.map(c => c.conversation_id) || [];
+
+    if (myChatIds.length > 0) {
+      const { data: sharedChat } = await supabase
+        .from('participants')
+        .select('conversation_id')
+        .in('conversation_id', myChatIds)
+        .eq('user_id', profile.id)
+        .maybeSingle();
+
+      if (sharedChat) {
+        router.push(`/chat/${sharedChat.conversation_id}`);
+        return;
+      }
+    }
+
+    // No existing conversation — create one
+    const { data: newChatId, error } = await supabase
+      .rpc('create_new_chat', { other_user_id: profile.id });
+
+    if (error || !newChatId) {
+      console.error('Failed to create chat:', error);
+      alert('Failed to start conversation.');
+      return;
+    }
+
+    router.push(`/chat/${newChatId}`);
+  }
 
   async function openFollowModal(type: 'followers' | 'following') {
     setFollowModal(type);
@@ -407,8 +447,8 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
                 )}
               </div>
 
-              {/* Follow / Edit button */}
-              <div className="pb-1">
+                            {/* Follow / Message / Edit buttons */}
+              <div className="pb-1 flex items-center gap-2">
                 {isOwnProfile ? (
                   <button
                     onClick={() => setIsEditing(true)}
@@ -417,17 +457,28 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
                     Edit Profile
                   </button>
                 ) : (
-                  <button
-                    onClick={toggleFollow}
-                    disabled={isFollowLoading}
-                    className={`font-bold py-2 px-5 rounded-full transition active:scale-95 text-sm ${
-                      isFollowing
-                        ? 'bg-transparent border border-red-500 text-white hover:border-red-500 hover:text-red-500 hover:bg-red-500/10'
-                        : 'bg-white text-black hover:bg-zinc-200'
-                    }`}
-                  >
-                    {isFollowing ? 'Following' : 'Follow'}
-                  </button>
+                  <>
+                    <button
+                      onClick={startChat}
+                      className="w-9 h-9 rounded-full border border-border-subtle text-brand hover:text-brand-hover transition active:scale-95 flex items-center justify-center"
+                      aria-label="Message"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={toggleFollow}
+                      disabled={isFollowLoading}
+                      className={`font-bold py-2 px-5 rounded-full transition active:scale-95 text-sm ${
+                        isFollowing
+                          ? 'bg-transparent border border-red-500 text-white hover:border-red-500 hover:text-red-500 hover:bg-red-500/10'
+                          : 'bg-white text-black hover:bg-zinc-200'
+                      }`}
+                    >
+                      {isFollowing ? 'Following' : 'Follow'}
+                    </button>
+                  </>
                 )}
               </div>
             </div>

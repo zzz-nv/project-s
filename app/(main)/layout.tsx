@@ -2,6 +2,8 @@
 
 import LeftRailProfile from "@/components/LeftRailProfile";
 import ComposeModal from "@/components/ComposeModal";
+import WhoToFollow from "@/components/WhoToFollow";
+
 import Link from "next/link";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
@@ -23,7 +25,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   const router = useRouter();
   const mainRef = useRef<HTMLElement>(null);
 
-  const [hasSession, setHasSession] = useState(false);
+  
   const [authChecked, setAuthChecked] = useState(false);
   const [username, setUsername] = useState<string | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
@@ -51,7 +53,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
         return;
       }
 
-      setHasSession(true);
+      
 
       // Fetch username for the Profile nav item
       const { data } = await supabase
@@ -173,12 +175,12 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   if (!authChecked) return null;
 
   return (
-    <div className="h-screen overflow-hidden bg-background flex justify-center pr-[280px]">
+        <div className="h-screen overflow-hidden bg-background flex justify-center">
 
-      <div className="flex h-full">
+        <div className="flex h-full">
 
         {/* LEFT RAIL */}
-        <nav className="w-[260px] shrink-0 h-full flex flex-col py-4 px-2 -translate-x-12">
+        <nav className="w-[260px] shrink-0 h-full flex flex-col py-4 px-2">
 
           <Link href="/" className="w-17 h-14 flex items-center justify-center mb-2 hover:opacity-90 transition-opacity">
             <img src="/S_logo.svg" alt="S" className="w-16 h-13" />
@@ -248,6 +250,13 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
         <main ref={mainRef} className={`${containerWidth} shrink-0 h-full overflow-y-auto no-scrollbar border-x border-border-subtle`}>
           {children}
         </main>
+
+        {/* RIGHT COLUMN — always mounted, visually hidden in chat */}
+        <aside className="w-[340px] shrink-0 h-full hidden xl:block pt-4 pl-8 pr-4 overflow-y-auto no-scrollbar">
+          <div className={isChat ? 'hidden' : 'block'}>
+            <WhoToFollow />
+          </div>
+        </aside>
 
       </div>
 

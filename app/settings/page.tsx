@@ -9,6 +9,7 @@ import ChangePasswordModal from '@/components/ChangePasswordModal';
 import { replaceAvatar, replaceBanner, removeAvatar, removeBanner } from '@/lib/manageProfileMedia';
 import ConfirmDialog from '@/components/ConfirmDialog';
 
+
 export default function SettingsPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('account');
@@ -81,24 +82,25 @@ export default function SettingsPage() {
     setProfileSaving(true);
     setProfileMessage('');
 
+    const trimmedName = displayName.trim();
+    const trimmedBio = bio.trim();
+
     const { error } = await supabase
       .from('profiles')
       .update({
-        display_name: displayName.trim(),
-        bio: bio.trim(),
+        display_name: trimmedName,
+        bio: trimmedBio,
       })
       .eq('id', userId);
 
     setProfileSaving(false);
 
-      if (error) {
-      setProfileMessage('Failed to save. Try again.');
-    } else {
-      setProfileMessage('Saved.');
+    if (error) {
+      setProfileMessage('Failed to save.');
       setTimeout(() => setProfileMessage(''), 2000);
-      window.dispatchEvent(new CustomEvent('show-toast', {
-        detail: { message: 'Saved' }
-      }));
+    } else {
+      setProfileMessage('Saved');
+      setTimeout(() => setProfileMessage(''), 2000);
     }
   }
 
@@ -251,10 +253,10 @@ export default function SettingsPage() {
     )
   })).filter(section => section.items.length > 0);
 
-  if (loading) {
+    if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-brand border-t-transparent rounded-full animate-spin"></div>
+        <div className="w-8 h-8 border-2 border-brand border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -283,7 +285,7 @@ export default function SettingsPage() {
           </div>
 
           {/* Grouped Navigation */}
-          <div className="bg-backgroundspace-y-6 flex-1 overflow-y-auto">
+          <div className="space-y-6 flex-1 overflow-y-auto">
             {filteredSections.map((section, idx) => (
               <div key={idx} className="space-y-1">
                 {section.title && (
@@ -482,10 +484,11 @@ export default function SettingsPage() {
                 <label className="block text-xs font-bold text-text-muted mb-2 uppercase tracking-wider">
                   Display name
                 </label>
-                <input
+                  <input
                   type="text"
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
+                  onBlur={saveProfileFields}
                   maxLength={50}
                   className="w-full bg-surface border border-border-subtle rounded-xl px-4 py-3 text-white focus:outline-none focus:border-brand transition-colors"
                 />
@@ -499,6 +502,7 @@ export default function SettingsPage() {
                 <textarea
                   value={bio}
                   onChange={(e) => setBio(e.target.value)}
+                  onBlur={saveProfileFields}
                   maxLength={160}
                   rows={3}
                   className="w-full bg-surface border border-border-subtle rounded-xl px-4 py-3 text-white focus:outline-none focus:border-brand transition-colors resize-none"
@@ -506,17 +510,13 @@ export default function SettingsPage() {
                 <p className="text-xs text-text-muted mt-1">{bio.length}/160</p>
               </div>
 
-              {/* SAVE */}
-              <div className="flex items-center gap-3 pt-2">
-                <button
-                  onClick={saveProfileFields}
-                  disabled={profileSaving}
-                  className="bg-brand hover:bg-brand-hover disabled:opacity-50 text-white font-bold py-2.5 px-6 rounded-full text-sm transition active:scale-95"
-                >
-                  {profileSaving ? 'Saving…' : 'Save changes'}
-                </button>
-                {profileMessage && (
-                  <span className="text-sm text-text-muted">{profileMessage}</span>
+              {/* SAVE FEEDBACK */}
+              <div className="pt-2 min-h-[20px]">
+                {profileSaving && (
+                  <span className="text-sm text-text-muted">Saving…</span>
+                )}
+                {!profileSaving && profileMessage && (
+                  <span className="text-sm text-emerald-400">{profileMessage}</span>
                 )}
               </div>
             </div>

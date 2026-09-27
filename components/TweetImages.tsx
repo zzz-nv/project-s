@@ -24,26 +24,26 @@ export default function TweetImages({ urls }: TweetImagesProps) {
     <>
       {/* ─── 1 IMAGE ─── */}
       {count === 1 && (
-        <div className="mt-3 rounded-2xl overflow-hidden border border-border-subtle">
+        <div className="mt-3 rounded-2xl overflow-hidden">
           <img
             src={images[0]}
             alt=""
             onClick={(e) => open(e, 0)}
-            className="w-full max-h-[600px] object-cover cursor-pointer hover:brightness-95 transition"
+            className="w-full max-h-[600px] object-cover cursor-pointer  transition"
           />
         </div>
       )}
 
       {/* ─── 2 IMAGES ─── */}
       {count === 2 && (
-        <div className="mt-3 grid grid-cols-2 gap-1 rounded-2xl overflow-hidden bg-border-subtle">
+        <div className="mt-3 grid grid-cols-2 gap-0 rounded-2xl overflow-hidden">
           {images.map((url, i) => (
             <img
               key={i}
               src={url}
               alt=""
               onClick={(e) => open(e, i)}
-              className="w-full h-[320px] object-cover cursor-pointer hover:brightness-95 transition"
+              className="w-full h-[320px] object-cover cursor-pointer  transition"
             />
           ))}
         </div>
@@ -51,25 +51,25 @@ export default function TweetImages({ urls }: TweetImagesProps) {
 
       {/* ─── 3 IMAGES ─── */}
       {count === 3 && (
-        <div className="mt-3 grid grid-cols-2 gap-1 rounded-2xl overflow-hidden bg-border-subtle h-[400px]">
+        <div className="mt-3 grid grid-cols-2 gap-0 rounded-2xl overflow-hidden  h-[400px]">
           <img
             src={images[0]}
             alt=""
             onClick={(e) => open(e, 0)}
-            className="w-full h-full object-cover cursor-pointer hover:brightness-95 transition"
+            className="w-full h-full object-cover cursor-pointer  transition"
           />
           <div className="grid grid-rows-2 gap-1">
             <img
               src={images[1]}
               alt=""
               onClick={(e) => open(e, 1)}
-              className="w-full h-full object-cover cursor-pointer hover:brightness-95 transition"
+              className="w-full h-full object-cover cursor-pointer  transition"
             />
             <img
               src={images[2]}
               alt=""
               onClick={(e) => open(e, 2)}
-              className="w-full h-full object-cover cursor-pointer hover:brightness-95 transition"
+              className="w-full h-full object-cover cursor-pointer  transition"
             />
           </div>
         </div>
@@ -77,14 +77,14 @@ export default function TweetImages({ urls }: TweetImagesProps) {
 
       {/* ─── 4 IMAGES ─── */}
       {count === 4 && (
-        <div className="mt-3 grid grid-cols-2 grid-rows-2 gap-1 rounded-2xl overflow-hidden bg-border-subtle h-[440px]">
+        <div className="mt-3 grid grid-cols-2 grid-rows-2 gap-0 rounded-2xl overflow-hidden bg-border-subtle h-[440px]">
           {images.map((url, i) => (
             <img
               key={i}
               src={url}
               alt=""
               onClick={(e) => open(e, i)}
-              className="w-full h-full object-cover cursor-pointer hover:brightness-95 transition"
+              className="w-full h-full object-cover cursor-pointer  transition"
             />
           ))}
         </div>
