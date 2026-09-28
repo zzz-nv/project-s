@@ -306,9 +306,11 @@ export default function ChatInboxPage() {
         ) : (
           <div className="flex flex-col">
             {filteredConversations.map((chat: any) => {
-              const isUnread =
+                const isUnread =
                 chat.conversations?.last_sender_id !== currentUserId &&
                 new Date(chat.conversations?.updated_at) > new Date(chat.my_last_read || 0);
+
+             
 
               return (
                 <Link

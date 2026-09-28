@@ -3,130 +3,160 @@
 import { useEffect, useState, use } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/app/supabase';
+import { loadChat } from '@/lib/loadChat';
 
 export default function ChatThreadPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: chatId } = use(params);
   const router = useRouter();
+  const queryClient = useQueryClient();
 
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [partner, setPartner] = useState<any>(null);
-  const [messages, setMessages] = useState<any[]>([]);
   const [inputText, setInputText] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    let subscription: any;
+  const { data, isLoading } = useQuery({
+    queryKey: ['chat', chatId],
+    queryFn: () => loadChat(chatId),
+  });
 
-    async function loadThread() {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const userId = sessionData.session?.user?.id;
-      if (!userId) {
-        router.push('/login');
-        return;
-      }
-      setCurrentUserId(userId);
+  const currentUserId = data?.currentUserId;
+  const partner = data?.partner;
+  const messages = data?.messages ?? [];
 
-      // Mark as read so the inbox badge clears
-      await supabase
-        .from('participants')
-        .update({ last_read_at: new Date().toISOString() })
-        .eq('conversation_id', chatId)
-        .eq('user_id', userId);
+  const setChatData = (updater: (prev: any) => any) => {
+    queryClient.setQueryData(['chat', chatId], (prev: any) => {
+      if (!prev) return prev;
+      return updater(prev);
+    });
+  };
 
-      const { data: participants } = await supabase
-        .from('participants')
-        .select('user_id, profiles(username, display_name, avatar_url)')
-        .eq('conversation_id', chatId);
-
-      if (!participants || participants.length === 0) {
-        setIsLoading(false);
-        return;
-      }
-
-      const otherUser = participants.find(p => p.user_id !== userId);
-      if (otherUser) setPartner(otherUser.profiles);
-
-      const { data: history } = await supabase
-        .from('messages')
-        .select('*')
-        .eq('conversation_id', chatId)
-        .order('created_at', { ascending: true });
-
-      if (history) setMessages(history);
-      setIsLoading(false);
-
-      subscription = supabase
-        .channel(`chat_${chatId}_${Date.now()}`)
-        .on(
-          'postgres_changes',
-          {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'messages',
-            filter: `conversation_id=eq.${chatId}`
-          },
-          (payload) => {
-            setMessages((prev) => {
-              if (prev.some((msg) => msg.id === payload.new.id)) return prev;
-              return [...prev, payload.new];
-            });
-          }
-        )
-        .subscribe();
+  // Mark as read — uses the SECURITY DEFINER RPC (bypasses RLS, always commits)
+  async function markAsRead(_userId: string) {
+    const { error } = await supabase.rpc('mark_chat_read', { p_chat_id: chatId });
+    if (error) {
+      console.error('[markAsRead] FAILED:', error);
     }
+  }
 
-    loadThread();
+  // Initial mark on mount
+  useEffect(() => {
+    if (!currentUserId) return;
+    markAsRead(currentUserId);
+  }, [chatId, currentUserId]);
+
+  // Re-mark when the tab regains focus
+  useEffect(() => {
+    if (!currentUserId) return;
+    const handler = () => {
+      if (document.visibilityState === 'visible') {
+        markAsRead(currentUserId);
+      }
+    };
+    document.addEventListener('visibilitychange', handler);
+    return () => document.removeEventListener('visibilitychange', handler);
+  }, [chatId, currentUserId]);
+
+  // Realtime — stable channel name, writes to cache directly
+  useEffect(() => {
+    if (!currentUserId) return;
+
+    const channel = supabase
+      .channel(`chat_room_${chatId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `conversation_id=eq.${chatId}`,
+        },
+          (payload) => {
+          const incoming = payload.new;
+
+          // The user is in the chat — this message is now read
+          if (incoming.sender_id !== currentUserId) {
+            markAsRead(currentUserId); // fire-and-forget, but errors now log
+          }
+
+          setChatData((prev) => {
+            // Already have this exact message
+            if (prev.messages.some((m: any) => m.id === incoming.id)) return prev;
+
+            // If a temp message with matching sender+content exists, the send
+            // function will swap it — skip to avoid a duplicate
+            const tempExists = prev.messages.some(
+              (m: any) =>
+                m.id.startsWith('temp-') &&
+                m.sender_id === incoming.sender_id &&
+                m.content === incoming.content
+            );
+            if (tempExists) return prev;
+
+            return { ...prev, messages: [...prev.messages, incoming] };
+          });
+        }
+      )
+      .subscribe();
 
     return () => {
-      if (subscription) supabase.removeChannel(subscription);
+      supabase.removeChannel(channel);
     };
-  }, [chatId]);
+  }, [chatId, currentUserId]);
 
   async function sendMessage(e: React.FormEvent) {
     e.preventDefault();
     if (!inputText.trim() || !currentUserId) return;
 
-    const textToSend = inputText.trim();
+    const text = inputText.trim();
     setInputText('');
 
-    // Optimistic UI
     const tempId = `temp-${Date.now()}`;
-    setMessages((prev) => [...prev, {
+    const optimistic = {
       id: tempId,
       conversation_id: chatId,
       sender_id: currentUserId,
-      content: textToSend,
-      created_at: new Date().toISOString()
-    }]);
+      content: text,
+      created_at: new Date().toISOString(),
+    };
 
-    const { data, error } = await supabase
+    setChatData((prev) => ({ ...prev, messages: [...prev.messages, optimistic] }));
+
+    const { data: inserted, error } = await supabase
       .from('messages')
       .insert({
         conversation_id: chatId,
         sender_id: currentUserId,
-        content: textToSend
+        content: text,
       })
       .select('id, created_at')
       .single();
 
     if (error) {
-      console.error("FATAL SEND ERROR:", error);
-      setMessages((prev) => prev.filter(msg => msg.id !== tempId));
-      setInputText(textToSend);
-    } else if (data) {
-      setMessages((prev) => prev.map(msg =>
-        msg.id === tempId ? { ...msg, id: data.id, created_at: data.created_at } : msg
-      ));
+      setChatData((prev) => ({
+        ...prev,
+        messages: prev.messages.filter((m: any) => m.id !== tempId),
+      }));
+      setInputText(text);
+      } else if (inserted) {
+      setChatData((prev) => ({
+        ...prev,
+        messages: prev.messages.map((m: any) =>
+          m.id === tempId ? { ...m, id: inserted.id, created_at: inserted.created_at } : m
+        ),
+      }));
+      // Sending = you've read everything up to this point
+      markAsRead(currentUserId);
     }
   }
 
-  async function handleBack() {
+    async function handleBack() {
+    // Wait for the read receipt to actually commit to the DB
     if (currentUserId) {
-      await supabase.rpc('mark_chat_read', { p_chat_id: chatId });
+      await markAsRead(currentUserId);
     }
-    router.refresh();
-    router.push(`/chat?r=${Date.now()}`);
+    // THEN invalidate — the DB is now correct
+    queryClient.invalidateQueries({ queryKey: ['inbox'] });
+    router.push('/chat');
   }
 
   if (isLoading) {
@@ -177,7 +207,7 @@ export default function ChatThreadPage({ params }: { params: Promise<{ id: strin
             <p>No messages yet. Say hello!</p>
           </div>
         ) : (
-          [...messages].reverse().map((msg) => {
+          [...messages].reverse().map((msg: any) => {
             const isMine = msg.sender_id === currentUserId;
             return (
               <div key={msg.id} className={`flex items-end gap-3 ${isMine ? 'justify-end' : 'justify-start'}`}>
