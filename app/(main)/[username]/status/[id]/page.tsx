@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, use } from 'react';
+import { useState, useEffect, use } from 'react';
 import { AnimatePresence } from 'motion/react';
 import { supabase } from '@/app/supabase';
 import Link from 'next/link';
@@ -29,12 +29,14 @@ export default function ThreadPage({ params }: { params: Promise<{ username: str
   const replies = data?.replies ?? [];
   const user = data?.currentUser;
 
-  const setThreadData = (updater: (prev: any) => any) => {
+    const setThreadData = (updater: (prev: any) => any) => {
     queryClient.setQueryData(['thread', id], (prev: any) => {
       if (!prev) return prev;
       return updater(prev);
     });
   };
+
+  
 
     async function postReply(e: React.FormEvent) {
     e.preventDefault();

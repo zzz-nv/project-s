@@ -90,6 +90,21 @@ export default function TweetCard({ tweet, currentUserId, onDelete, variant = 'f
     fetchFallbackData();
   }, [tweet.id, currentUserId, isHydrated]);
 
+    
+  
+  // Sync local state when any view of this tweet changes its like
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { tweetId, isLiked: newLiked, likeCount: newCount } = (e as CustomEvent).detail;
+      if (tweetId !== tweet.id) return;
+      setIsLiked(newLiked);
+      setLikeCount(newCount);
+    };
+    window.addEventListener('like-updated', handler);
+    return () => window.removeEventListener('like-updated', handler);
+  }, [tweet.id]);
+
+
   const fetchReplies = async () => {
     const { data } = await supabase
       .from('tweets')
@@ -109,6 +124,12 @@ export default function TweetCard({ tweet, currentUserId, onDelete, variant = 'f
     fetchReplies();
   }
 
+    function broadcastLike(newLiked: boolean, newCount: number) {
+    window.dispatchEvent(new CustomEvent('like-updated', {
+      detail: { tweetId: tweet.id, isLiked: newLiked, likeCount: newCount },
+    }));
+  }
+
   async function toggleLike(e: React.MouseEvent) {
     e.stopPropagation();
     if (!currentUserId || isLiking) return;
@@ -116,31 +137,37 @@ export default function TweetCard({ tweet, currentUserId, onDelete, variant = 'f
     setIsLiking(true);
     const previousLiked = isLiked;
     const previousCount = likeCount;
+    const newLiked = !previousLiked;
+    const newCount = newLiked ? previousCount + 1 : previousCount - 1;
 
-      // Optimistic UI Update (No load animations)
-    setIsLiked(!previousLiked);
-    setLikeCount(previousLiked ? previousCount - 1 : previousCount + 1);
+    // Optimistic UI
+    setIsLiked(newLiked);
+    setLikeCount(newCount);
     setPulseKey(k => k + 1);
 
+    // Broadcast to parent caches + other TweetCard instances
+    broadcastLike(newLiked, newCount);
+
+    let error;
     if (previousLiked) {
-      const { error } = await supabase
+      ({ error } = await supabase
         .from('likes')
         .delete()
         .eq('tweet_id', tweet.id)
-        .eq('user_id', currentUserId);
-      if (error) {
-        setIsLiked(previousLiked);
-        setLikeCount(previousCount);
-      }
+        .eq('user_id', currentUserId));
     } else {
-      const { error } = await supabase
+      ({ error } = await supabase
         .from('likes')
-        .insert({ tweet_id: tweet.id, user_id: currentUserId });
-      if (error) {
-        setIsLiked(previousLiked);
-        setLikeCount(previousCount);
-      }
+        .insert({ tweet_id: tweet.id, user_id: currentUserId }));
     }
+
+    if (error) {
+      // Rollback local + broadcast rollback
+      setIsLiked(previousLiked);
+      setLikeCount(previousCount);
+      broadcastLike(previousLiked, previousCount);
+    }
+
     setIsLiking(false);
   }
 

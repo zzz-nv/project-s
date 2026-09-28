@@ -75,6 +75,8 @@ export default function ProjectS() {
     }
   }, [data]);
 
+  
+  
   // Refresh feed when a new tweet is posted
   useEffect(() => {
     const handleRefresh = () => {
@@ -83,6 +85,8 @@ export default function ProjectS() {
     window.addEventListener('refresh-feed', handleRefresh);
     return () => window.removeEventListener('refresh-feed', handleRefresh);
   }, [queryClient]);
+
+  
 
     async function deleteTweet(tweetId: string) {
     // Optimistic cache update — triggers the exit animation

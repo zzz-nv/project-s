@@ -62,6 +62,8 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
     }
   }, []);
 
+    
+
   // Scroll to the new tweet once it renders
   useEffect(() => {
     if (!justPostedId || !data) return;

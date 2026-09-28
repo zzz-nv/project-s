@@ -71,6 +71,7 @@ export default function ComposeModal() {
     setError('');
 
     let imageUrls: string[] = [];
+    let uploadedPaths: string[] = [];
     if (files.length > 0) {
       const upload = await uploadImages(files);
       if (!upload.ok) {
@@ -79,10 +80,17 @@ export default function ComposeModal() {
         return;
       }
       imageUrls = upload.urls;
+      uploadedPaths = upload.paths;
     }
 
-        const result = await postTweet(content, imageUrls);
+    const result = await postTweet(content, imageUrls);
     setIsPosting(false);
+
+    // If the post failed, clean up the images we already uploaded
+    if (!result.ok && uploadedPaths.length > 0) {
+      const { deleteImages } = await import('@/lib/uploadImage');
+      deleteImages(uploadedPaths).catch(() => {});
+    }
 
     if (result.ok) {
       setIsOpen(false);
