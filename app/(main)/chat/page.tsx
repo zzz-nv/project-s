@@ -117,15 +117,16 @@ export default function ChatInboxPage() {
     };
   }, [currentUserId]);
 
-  async function fetchNewChatRoom(conversationId: string, userId: string) {
-    const { data: amIInIt } = await supabase
+    async function fetchNewChatRoom(conversationId: string, userId: string) {
+    const { data: myRow } = await supabase
       .from('participants')
-      .select('user_id')
+      .select('user_id, hidden_at')
       .eq('conversation_id', conversationId)
       .eq('user_id', userId)
       .single();
 
-    if (!amIInIt) return;
+    if (!myRow) return;         // Not a participant — ignore
+    if (myRow.hidden_at) return; // We've left this chat — don't resurface
 
     const { data: newPartner } = await supabase
       .from('participants')

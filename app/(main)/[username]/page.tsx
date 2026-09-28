@@ -134,7 +134,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
   async function startChat() {
     if (!currentUser || !profile) return;
 
-    // Check for an existing conversation with this user
+    // Check for an existing conversation with this user (including hidden ones)
     const { data: myChats } = await supabase
       .from('participants')
       .select('conversation_id')
@@ -151,6 +151,13 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
         .maybeSingle();
 
       if (sharedChat) {
+        // If we had hidden ourselves, unhide — user is intentionally reopening
+        await supabase
+          .from('participants')
+          .update({ hidden_at: null })
+          .eq('conversation_id', sharedChat.conversation_id)
+          .eq('user_id', currentUser.id);
+
         router.push(`/chat/${sharedChat.conversation_id}`);
         return;
       }

@@ -11,10 +11,11 @@ export async function loadInbox(): Promise<InboxPayload | null> {
   if (!userId) return null;
 
   // 1. Get your chats + your personal last_read_at
-  const { data: myChats } = await supabase
+    const { data: myChats } = await supabase
     .from('participants')
     .select('conversation_id, last_read_at')
-    .eq('user_id', userId);
+    .eq('user_id', userId)
+    .is('hidden_at', null);
 
   const chatIds = myChats?.map(c => c.conversation_id) || [];
 

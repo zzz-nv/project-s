@@ -5,7 +5,9 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/app/supabase';
+
 import { loadChat } from '@/lib/loadChat';
+import ConfirmDialog from '@/components/ConfirmDialog';
 
 export default function ChatThreadPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: chatId } = use(params);
@@ -13,6 +15,7 @@ export default function ChatThreadPage({ params }: { params: Promise<{ id: strin
   const queryClient = useQueryClient();
 
   const [inputText, setInputText] = useState('');
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ['chat', chatId],
@@ -103,6 +106,37 @@ export default function ChatThreadPage({ params }: { params: Promise<{ id: strin
     };
   }, [chatId, currentUserId]);
 
+  
+  
+  
+    async function leaveConversation() {
+    if (!currentUserId) return;
+
+    const { error } = await supabase
+      .from('participants')
+      .update({ hidden_at: new Date().toISOString() })
+      .eq('conversation_id', chatId)
+      .eq('user_id', currentUserId);
+
+    if (error) {
+      console.error('[leaveConversation] FAILED:', error);
+      alert('Failed to leave conversation.');
+      return;
+    }
+
+    // Remove from inbox cache + navigate back
+    queryClient.setQueryData(['inbox'], (prev: any) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        conversations: prev.conversations.filter((c: any) => c.conversation_id !== chatId),
+      };
+    });
+    queryClient.invalidateQueries({ queryKey: ['inbox'] });
+    router.push('/chat');
+  }
+
+  
   async function sendMessage(e: React.FormEvent) {
     e.preventDefault();
     if (!inputText.trim() || !currentUserId) return;
@@ -182,7 +216,7 @@ export default function ChatThreadPage({ params }: { params: Promise<{ id: strin
         </button>
 
         {partner && (
-          <Link href={`/${partner.username}`} className="flex items-center gap-3 group">
+          <Link href={`/${partner.username}`} className="flex items-center gap-3 group flex-1">
             <div className="w-10 h-10 rounded-full bg-surface-muted flex items-center justify-center overflow-hidden shrink-0 group-hover:brightness-90 transition-all">
               {partner.avatar_url ? (
                 <img src={partner.avatar_url} alt="avatar" className="w-full h-full object-cover" />
@@ -198,6 +232,16 @@ export default function ChatThreadPage({ params }: { params: Promise<{ id: strin
             </div>
           </Link>
         )}
+
+        <button
+          onClick={() => setShowLeaveConfirm(true)}
+          className="w-9 h-9 shrink-0 rounded-full hover:bg-red-500/10 text-text-muted hover:text-red-500 flex items-center justify-center transition-colors"
+          aria-label="Leave conversation"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+          </svg>
+        </button>
       </div>
 
       {/* MESSAGE HISTORY */}
@@ -264,7 +308,21 @@ export default function ChatThreadPage({ params }: { params: Promise<{ id: strin
             </svg>
           </button>
         </div>
-      </form>
+            </form>
+
+      {showLeaveConfirm && (
+        <ConfirmDialog
+          title="Leave conversation?"
+          message="It will be removed from your inbox. You can start a new one anytime from their profile."
+          confirmText="Leave"
+          destructive
+          onConfirm={() => {
+            setShowLeaveConfirm(false);
+            leaveConversation();
+          }}
+          onCancel={() => setShowLeaveConfirm(false)}
+        />
+      )}
 
     </div>
   );

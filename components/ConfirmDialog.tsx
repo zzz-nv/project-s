@@ -66,16 +66,16 @@ export default function ConfirmDialog({
           <div className="px-6 pb-6 flex gap-3 justify-end">
             <button
               onClick={onCancel}
-              className="px-4 py-2 rounded-full text-sm font-bold text-zinc-300 hover:bg-surface transition-colors"
+              className="px-5 py-2.5 rounded-full text-sm font-bold text-zinc-300 hover:text-white hover:bg-surface-hover active:scale-95 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-subtle"
             >
               {cancelText}
             </button>
             <button
               onClick={onConfirm}
-              className={`px-4 py-2 rounded-full text-sm font-bold text-white transition-colors active:scale-95 ${
+              className={`px-5 py-2.5 rounded-full text-sm font-bold text-white active:scale-95 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
                 destructive
-                  ? 'bg-red-500 hover:bg-red-600'
-                  : 'bg-brand hover:bg-brand-hover'
+                  ? 'bg-red-500 hover:bg-red-600 hover:shadow-lg hover:shadow-red-500/25 focus-visible:ring-red-500'
+                  : 'bg-brand hover:bg-brand-hover hover:shadow-lg hover:shadow-brand/25 focus-visible:ring-brand'
               }`}
             >
               {confirmText}
